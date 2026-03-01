@@ -5,20 +5,18 @@
 [![GitHub license](https://img.shields.io/github/license/4x3/Zenith?color=white&style=flat-square)](https://github.com/4x3/Zenith/blob/main/LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-white?style=flat-square)](https://www.python.org/downloads/)
 
-> Premium, minimalist interaction utility for competitive environments.
+> A fully external, high-performance Minecraft autoclicker.
 
-Zenith is a high-performance, multithreaded autoclicker designed with a focus on stability, low-latency execution, and an ultra-minimalist graphical interface. It operates independently of its UI, ensuring uninterrupted background execution even during heavy system loads.
+Zenith is a lightweight, multithreaded autoclicker built specifically for Minecraft PvP. Because it operates completely externally and does not inject into the Java Virtual Machine (JVM), it is safe to use on major servers like Hypixel. It utilizes advanced randomized CPS generation to seamlessly bypass server-side anti-cheats and heuristic detection.
 
-## Architecture & Features
+## Features
 
-Zenith is built on an object-oriented Python architecture, utilizing `win32api` for hardware-level input simulation and `DearPyGui` for a lightweight, hardware-accelerated presentation layer.
-
-* **Independent Threading:** GUI and clicker loops operate on isolated daemon threads for absolute fault tolerance.
-* **Smart Window Targeting:** Only executes inputs when authorized target processes (e.g., `java`, `AZ-Launcher`) are in focus.
-* **Persistent Configuration:** Automatically and silently saves user states to localized JSON configuration files.
-* **Advanced Randomization:** Context-aware click delays to simulate organic input profiles.
-* **Modular Payload:** Support for advanced parameters including dynamic cursor shake, block-hitting, and custom audio feedback.
-* **Discord Integration:** Built-in Rich Presence (RPC) functionality to display status.
+* **Fully External:** Runs entirely outside of the Minecraft process, making it completely invisible to client-side injection checks.
+* **Anti-Cheat Bypass:** Utilizes intelligent, randomized click delays to simulate legitimate human input and bypass server-side detection on servers like Hypixel.
+* **Smart Window Targeting:** Only clicks when a Minecraft client (`java`, `AZ-Launcher`) is your active, focused window.
+* **Advanced PvP Mechanics:** Built-in toggles for realistic cursor shake and automated block-hitting to give you an edge in combat.
+* **Persistent Configuration:** Automatically saves your module settings, binds, and CPS values locally.
+* **Discord RPC:** Optional Discord Rich Presence integration to show your status.
 
 ## Prerequisites
 
@@ -45,9 +43,9 @@ python zenith.py
 3. **Advanced Parameters:** Expand the header to access Cursor Shake (force adjustments) and Block-hitting (probability scaling).
 4. **Audio Routing:** Input a local `.wav` file path to replace standard system click sounds.
 
-## Disclaimer
+## Legal Disclaimer
 
-Zenith is developed for educational purposes, macro automation, and personal use. Users are strictly responsible for adhering to the terms of service and end-user license agreements of any third-party software or servers they interact with while using this utility.
+Zenith is a third-party utility developed for educational purposes and personal use. This project is not affiliated with, endorsed by, or connected to Mojang AB, Microsoft Corporation, or Hypixel Inc. Use this software at your own risk. The developer assumes no responsibility for account bans, punishments, or damages resulting from the use of this tool.
 
 ## License
 
