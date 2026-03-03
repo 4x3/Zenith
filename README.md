@@ -32,7 +32,7 @@ pip install dearpygui pymeow pypresence psutil pywin32
 Run the core engine from your terminal:
 
 ```bash
-python zenith.py
+python Zenith.py
 
 ```
 
