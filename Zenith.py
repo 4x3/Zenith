@@ -1,4 +1,4 @@
-version = "1.0.0"
+version = "1.1.0"
 
 import win32api, win32con, win32gui, win32process, psutil, time, threading, random, winsound, os, json, sys, asyncio
 import dearpygui.dearpygui as dpg
@@ -377,3 +377,4 @@ if __name__ == "__main__":
         gui.run()
     except KeyboardInterrupt:
         os._exit(0)
+
