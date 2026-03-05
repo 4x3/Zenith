@@ -1,6 +1,6 @@
 version = "1.0.0"
 
-import win32api, win32con, win32gui, win32process, psutil, time, threading, random, winsound, os, json, sys
+import win32api, win32con, win32gui, win32process, psutil, time, threading, random, winsound, os, json, sys, asyncio
 import dearpygui.dearpygui as dpg
 from pypresence import Presence
 
@@ -10,12 +10,10 @@ class ClickerConfig(dict):
         self.hwid = hwid
         self.save_path = f"{os.environ['LOCALAPPDATA']}\\Temp\\Zenith_{self.hwid}.json"
         
-        # Try to load existing config
         if os.path.exists(self.save_path):
             try:
                 with open(self.save_path, "r", encoding="utf-8") as f:
                     saved_dict = json.load(f)
-                    # Basic validation to ensure keys match
                     if all(k in saved_dict for k in initial_dict):
                         initial_dict = saved_dict
             except Exception:
@@ -47,11 +45,11 @@ class ZenithEngine:
             "left": {
                 "enabled": False, "mode": "hold", "cps": 12, "focus_only": True, 
                 "blatant": False, "blockhit": False, "blockhit_chance": 25, 
-                "shake": False, "shake_force": 5, "sound_path": ""
+                "shake": False, "shake_force": 5, "sound_path": "", "bind": 0
             },
             "right": {
                 "enabled": False, "mode": "hold", "cps": 12, "focus_only": True, 
-                "blatant": False, "shake": False, "shake_force": 5, "sound_path": ""
+                "blatant": False, "shake": False, "shake_force": 5, "sound_path": "", "bind": 0
             },
             "misc": {"rpc": True}
         }
@@ -60,25 +58,37 @@ class ZenithEngine:
         self.focused_process = ""
         self.mc_window = None
 
-        # Daemon threads close automatically when the main program closes
         threading.Thread(target=self.rpc_handler, daemon=True).start()
         threading.Thread(target=self.window_listener, daemon=True).start()
+        threading.Thread(target=self.bind_listener, daemon=True).start()
         threading.Thread(target=self.click_loop, args=("left", 0x01), daemon=True).start()
         threading.Thread(target=self.click_loop, args=("right", 0x02), daemon=True).start()
 
     def rpc_handler(self):
-        try:
-            rpc = Presence("1044302531272126534") # Replace with your Zenith Discord Client ID
-            rpc.connect()
-            start_time = time.time()
-            while True:
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        start_time = time.time()
+        rpc = None
+        
+        while True:
+            try:
                 if self.config["misc"]["rpc"]:
-                    rpc.update(state="Premium Interaction.", start=start_time, large_image="logo", large_text="Zenith")
+                    # If toggled ON and no connection exists, build it
+                    if rpc is None:
+                        rpc = Presence("1479253362716180564") 
+                        rpc.connect()
+                    
+                    rpc.update(state="Premium MC Autoclicker", start=start_time, large_image="logo", large_text="Zenith")
                 else:
-                    rpc.clear()
-                time.sleep(15)
-        except Exception:
-            pass
+                    # If toggled OFF, clear it, close the connection, and reset
+                    if rpc is not None:
+                        rpc.clear()
+                        rpc.close()
+                        rpc = None
+            except Exception:
+                # If Discord closes or errors out, wipe the connection so it auto-reconnects later
+                rpc = None
+                
+            time.sleep(15) # Sleeps to respect Discord's strict 15-second RPC rate limit
 
     def window_listener(self):
         while True:
@@ -89,6 +99,28 @@ class ZenithEngine:
             except Exception:
                 self.focused_process = ""
             time.sleep(0.5)
+
+    def bind_listener(self):
+        """Dedicated thread to listen for toggle hotkeys without lagging the clicker."""
+        key_states = {"left": False, "right": False}
+        while True:
+            for module in ["left", "right"]:
+                bind = self.config[module].get("bind", 0)
+                if bind != 0:
+                    is_pressed = win32api.GetAsyncKeyState(bind) < 0
+                    if is_pressed and not key_states[module]:
+                        new_state = not self.config[module]["enabled"]
+                        self.config[module]["enabled"] = new_state
+                        key_states[module] = True
+                        
+                        try:
+                            if dpg.does_alias_exist(f"{module}_enabled_checkbox"):
+                                dpg.set_value(f"{module}_enabled_checkbox", new_state)
+                        except Exception:
+                            pass
+                    elif not is_pressed:
+                        key_states[module] = False
+            time.sleep(0.01)
 
     def apply_shake(self, force):
         current_pos = win32api.GetCursorPos()
@@ -103,7 +135,7 @@ class ZenithEngine:
     def click_loop(self, button_type, vkey):
         while True:
             cfg = self.config[button_type]
-            if cfg["cps"] == 0: cfg["cps"] = 1 # Prevent division by zero
+            if cfg["cps"] == 0: cfg["cps"] = 1 
             
             delay = 1 / cfg["cps"] if cfg["blatant"] else random.random() % (2 / cfg["cps"])
 
@@ -127,7 +159,6 @@ class ZenithEngine:
         me_down = win32con.MOUSEEVENTF_LEFTDOWN if vkey == 0x01 else win32con.MOUSEEVENTF_RIGHTDOWN
         me_up = win32con.MOUSEEVENTF_LEFTUP if vkey == 0x01 else win32con.MOUSEEVENTF_RIGHTUP
 
-        # Execute Click
         if focused and self.mc_window:
             win32api.SendMessage(self.mc_window, down, 0, 0)
             time.sleep(0.02)
@@ -137,7 +168,6 @@ class ZenithEngine:
             time.sleep(0.02)
             win32api.mouse_event(me_up, 0, 0)
 
-        # Advanced Features
         if cfg.get("shake"):
             self.apply_shake(cfg["shake_force"])
 
@@ -159,6 +189,8 @@ class ZenithGUI:
     """The sleek, dark presentation layer."""
     def __init__(self, engine: ZenithEngine):
         self.engine = engine
+        self.binding_module = None
+        self.binding_button = None
 
     def build_theme(self):
         with dpg.theme() as premium_theme:
@@ -187,15 +219,55 @@ class ZenithGUI:
 
         dpg.bind_theme(premium_theme)
 
+    def get_key_name(self, vk):
+        """Translates Windows VK codes to human-readable strings."""
+        if 65 <= vk <= 90 or 48 <= vk <= 57: return chr(vk)
+        special = {
+            4: "M3", 5: "M4", 6: "M5", 8: "BACK", 9: "TAB", 13: "ENTER", 
+            16: "SHIFT", 17: "CTRL", 18: "ALT", 20: "CAPS", 32: "SPACE",
+            160: "LSHIFT", 161: "RSHIFT", 162: "LCTRL", 163: "RCTRL", 164: "LALT", 165: "RALT"
+        }
+        return special.get(vk, f"#{vk}")
+
+    def wait_for_bind(self, sender, app_data, user_data):
+        if self.binding_module is not None:
+            return
+            
+        self.binding_module = user_data
+        self.binding_button = sender
+        dpg.set_item_label(sender, "[...]")
+        
+        threading.Thread(target=self.capture_bind, daemon=True).start()
+
+    def capture_bind(self):
+        time.sleep(0.1) 
+        while self.binding_module:
+            for vk in range(1, 255):
+                if vk in [1, 2]: continue
+                
+                if win32api.GetAsyncKeyState(vk) < 0:
+                    module = self.binding_module
+                    self.binding_module = None
+                    
+                    if vk == 27: 
+                        self.engine.config[module]["bind"] = 0
+                        dpg.set_item_label(self.binding_button, "[ - ]")
+                    else:
+                        self.engine.config[module]["bind"] = vk
+                        dpg.set_item_label(self.binding_button, f"[ {self.get_key_name(vk)} ]")
+                    return
+            time.sleep(0.01)
+
     def draw_module(self, title, config_key):
-        with dpg.child_window(width=280, height=340, border=False):
+        with dpg.child_window(width=280, height=360, border=False):
             dpg.add_text(title, color=(110, 120, 255))
             dpg.add_separator()
             dpg.add_spacer(height=5)
             
             with dpg.group(horizontal=True):
                 dpg.add_checkbox(label="enabled", default_value=self.engine.config[config_key]["enabled"], 
-                                 callback=lambda s, d: self.engine.config[config_key].update({"enabled": d}))
+                                 callback=lambda s, d: self.engine.config[config_key].update({"enabled": d}),
+                                 tag=f"{config_key}_enabled_checkbox")
                 dpg.add_checkbox(label="blatant", default_value=self.engine.config[config_key]["blatant"], 
                                  callback=lambda s, d: self.engine.config[config_key].update({"blatant": d}))
             
@@ -203,10 +275,20 @@ class ZenithGUI:
                                callback=lambda s, d: self.engine.config[config_key].update({"cps": d}))
             
             with dpg.group(horizontal=True):
-                dpg.add_combo(items=["hold", "always"], default_value=self.engine.config[config_key]["mode"], width=100,
+                dpg.add_combo(items=["hold", "always"], default_value=self.engine.config[config_key]["mode"], width=90,
                               callback=lambda s, d: self.engine.config[config_key].update({"mode": d}))
                 dpg.add_text(" mode")
             
+            dpg.add_spacer(height=2)
+            
+            # Keybind Row
+            with dpg.group(horizontal=True):
+                bind_val = self.engine.config[config_key].get("bind", 0)
+                bind_char = self.get_key_name(bind_val) if bind_val != 0 else "-"
+                
+                dpg.add_text("key", color=(150, 150, 150))
+                dpg.add_button(label=f"[ {bind_char} ]", width=60, user_data=config_key, callback=self.wait_for_bind)
+
             dpg.add_spacer(height=10)
             
             # Advanced Features Dropdown
@@ -263,18 +345,35 @@ class ZenithGUI:
         dpg.start_dearpygui()
         dpg.destroy_context()
 
+def stylize_terminal():
+    """Clears the console, sets the title, and prints a stylized ASCII banner."""
+    os.system("title Zenith")
+    os.system("cls" if os.name == "nt" else "clear")
+    os.system("")
+    
+    banner = """\033[38;2;110;120;255m
+    ███████╗███████╗███╗   ██╗██╗████████╗██╗  ██╗
+    ╚══███╔╝██╔════╝████╗  ██║██║╚══██╔══╝██║  ██║
+      ███╔╝ █████╗  ██╔██╗ ██║██║   ██║   ███████║
+     ███╔╝  ██╔══╝  ██║╚██╗██║██║   ██║   ██╔══██║
+    ███████╗███████╗██║ ╚████║██║   ██║   ██║  ██║
+    ╚══════╝╚══════╝╚═╝  ╚═══╝╚═╝   ╚═╝   ╚═╝  ╚═╝
+    
+    [ System Online ]
+    [ Do not close this window while Zenith is running ]\033[0m
+    """
+    print(banner)
+
 if __name__ == "__main__":
     if os.name != "nt":
         sys.exit("Zenith requires a Windows environment.")
 
     try:
-        # Simple local identifier generation. This is where KeyAuth will go later.
+        stylize_terminal()
         hwid = str(os.getlogin()) 
         
-        # Initialize Architecture
         engine = ZenithEngine(hwid)
         gui = ZenithGUI(engine)
-        
         gui.run()
     except KeyboardInterrupt:
         os._exit(0)
