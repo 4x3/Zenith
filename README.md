@@ -5,18 +5,18 @@
 [![GitHub license](https://img.shields.io/github/license/4x3/Zenith?color=white&style=flat-square)](https://github.com/4x3/Zenith/blob/main/LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-white?style=flat-square)](https://www.python.org/downloads/)
 
-> A fully external, high-performance Minecraft autoclicker.
+> A fully external autoclicker for Minecraft PvP.
 
-Zenith is a lightweight, multithreaded autoclicker built specifically for Minecraft PvP. Because it operates completely externally and does not inject into the Java Virtual Machine (JVM), it is safe to use on major servers like Hypixel. It utilizes advanced randomized CPS generation to seamlessly bypass server-side anti-cheats and heuristic detection.
+Zenith runs outside the Minecraft process entirely — no JVM injection, so it doesn't trip client-side checks on servers like Hypixel. Click timing is randomized per-press instead of a fixed interval, which is what actually matters for staying under server-side heuristics.
 
 ## Features
 
-* **Fully External:** Runs entirely outside of the Minecraft process, making it completely invisible to client-side injection checks.
-* **Anti-Cheat Bypass:** Utilizes intelligent, randomized click delays to simulate legitimate human input and bypass server-side detection on servers like Hypixel.
-* **Smart Window Targeting:** Only clicks when a Minecraft client (`java`, `AZ-Launcher`) is your active, focused window.
-* **Advanced PvP Mechanics:** Built-in toggles for realistic cursor shake and automated block-hitting to give you an edge in combat.
-* **Persistent Configuration:** Automatically saves your module settings, binds, and CPS values locally.
-* **Discord RPC:** Optional Discord Rich Presence integration to show your status.
+* Runs as a separate process; nothing gets injected into the game
+* Randomized click delays instead of a fixed CPS, to look less like a bot on servers that watch for that
+* Only fires while a Minecraft client (`java`, `AZ-Launcher`) is the focused window
+* Cursor shake and auto block-hit toggles for PvP
+* Config (binds, CPS, module settings) is saved locally between runs
+* Optional Discord Rich Presence
 
 ## Prerequisites
 

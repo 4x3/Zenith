@@ -5,7 +5,7 @@ import dearpygui.dearpygui as dpg
 from pypresence import Presence
 
 class ClickerConfig(dict):
-    """Listens for configuration changes and auto-saves silently."""
+    """dict subclass that writes itself to disk on every mutation."""
     def __init__(self, initial_dict, hwid):
         self.hwid = hwid
         self.save_path = f"{os.environ['LOCALAPPDATA']}\\Temp\\Zenith_{self.hwid}.json"
@@ -37,7 +37,7 @@ class ClickerConfig(dict):
             pass
 
 class ZenithEngine:
-    """Core backend logic. Fully isolated from the GUI for stability."""
+    """No GUI imports in here — keeps the clicker threads alive even if dpg misbehaves."""
     def __init__(self, hwid: str):
         self.hwid = hwid
         
@@ -72,23 +72,20 @@ class ZenithEngine:
         while True:
             try:
                 if self.config["misc"]["rpc"]:
-                    # If toggled ON and no connection exists, build it
                     if rpc is None:
                         rpc = Presence("1479253362716180564") 
                         rpc.connect()
                     
                     rpc.update(state="Premium MC Autoclicker", start=start_time, large_image="logo", large_text="Zenith")
-                else:
-                    # If toggled OFF, clear it, close the connection, and reset
-                    if rpc is not None:
-                        rpc.clear()
-                        rpc.close()
-                        rpc = None
+                elif rpc is not None:
+                    rpc.clear()
+                    rpc.close()
+                    rpc = None
             except Exception:
-                # If Discord closes or errors out, wipe the connection so it auto-reconnects later
+                # discord probably closed — drop the handle so we reconnect next pass
                 rpc = None
                 
-            time.sleep(15) # Sleeps to respect Discord's strict 15-second RPC rate limit
+            time.sleep(15)  # discord rate-limits RPC updates to one every 15s
 
     def window_listener(self):
         while True:
@@ -101,7 +98,7 @@ class ZenithEngine:
             time.sleep(0.5)
 
     def bind_listener(self):
-        """Dedicated thread to listen for toggle hotkeys without lagging the clicker."""
+        """own thread so polling hotkeys never steals cycles from the click loops"""
         key_states = {"left": False, "right": False}
         while True:
             for module in ["left", "right"]:
@@ -186,7 +183,6 @@ class ZenithEngine:
                     win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0, 0)
 
 class ZenithGUI:
-    """The sleek, dark presentation layer."""
     def __init__(self, engine: ZenithEngine):
         self.engine = engine
         self.binding_module = None
@@ -220,7 +216,6 @@ class ZenithGUI:
         dpg.bind_theme(premium_theme)
 
     def get_key_name(self, vk):
-        """Translates Windows VK codes to human-readable strings."""
         if 65 <= vk <= 90 or 48 <= vk <= 57: return chr(vk)
         special = {
             4: "M3", 5: "M4", 6: "M5", 8: "BACK", 9: "TAB", 13: "ENTER", 
@@ -346,7 +341,6 @@ class ZenithGUI:
         dpg.destroy_context()
 
 def stylize_terminal():
-    """Clears the console, sets the title, and prints a stylized ASCII banner."""
     os.system("title Zenith")
     os.system("cls" if os.name == "nt" else "clear")
     os.system("")
